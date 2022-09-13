@@ -28,10 +28,21 @@ void setup_wifi()
     // connect to wifi, retry indefinitely if fail.
     // TODO: reset ESP if fail more than 10 times?
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    int wifiConnectTries = 0;
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(3000);
         Serial.print(".");
+        if (wifiConnectTries >= 10)
+        {
+            Serial.print(F("Wifi not connecting, resetting..."));
+            ESP.restart();
+        }
+        else
+        {
+            wifiConnectTries += 1;
+        }
     }
 
     Serial.println();
@@ -147,8 +158,8 @@ void callback(char *topic, byte *payload, uint length)
         if (strncmp((char *)payload, "ON", length) == 0)
         {
             Serial.println("Action - Power - ON");
-            //IRsender.sendRaw(AC25, sizeof(AC25) / sizeof(AC25[0]), 38);
-            //mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "25.0", true);
+            // IRsender.sendRaw(AC25, sizeof(AC25) / sizeof(AC25[0]), 38);
+            // mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "25.0", true);
         }
         if (strncmp((char *)payload, "OFF", length) == 0)
         {
@@ -167,7 +178,7 @@ void setup()
     //  TODO: use mDNS resolving if possible
     mqttClient.setServer(MQTT_BROKER, MQTT_BROKER_PORT);
     mqttClient.setCallback(callback);
-    
+
     IRsender.begin();
 }
 
