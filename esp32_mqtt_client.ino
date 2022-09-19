@@ -26,7 +26,6 @@ void setup_wifi()
     Serial.println(WIFI_SSID);
 
     // connect to wifi, retry indefinitely if fail.
-    // TODO: reset ESP if fail more than 10 times?
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int wifiConnectTries = 0;
@@ -101,7 +100,7 @@ void callback(char *topic, byte *payload, uint length)
         if (strncmp((char *)payload, "18.0", length) == 0)
         {
             Serial.println("Action - Temp - 18");
-            IRsender.sendRaw(AC19, sizeof(AC18) / sizeof(AC18[0]), 38);
+            IRsender.sendRaw(AC18, sizeof(AC18) / sizeof(AC18[0]), 38);
             mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "18.0", true);
         }
         if (strncmp((char *)payload, "19.0", length) == 0)
