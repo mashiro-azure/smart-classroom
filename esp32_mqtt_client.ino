@@ -7,8 +7,10 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <IRsend.h>
+#include <DHT.h>
 #include "include/settings.h"
 #include "include/acData.h"
+
 
 // setup wifi & mqtt
 WiFiClient wifiClient;
@@ -16,6 +18,13 @@ PubSubClient mqttClient(wifiClient);
 
 // setup ir
 IRsend IRsender(IRsendPin);
+
+// setup states
+bool lightOn;
+DHT dht(DHTPin, DHTType);
+TaskHandle_t DHTTask;
+volatile float t;
+volatile float h;
 
 void setup_wifi()
 {
@@ -65,6 +74,9 @@ void mqttReconnect()
         {
             // announce going online
             mqttClient.publish(MQTT_AVAIL_TOPIC, "online", true);
+            mqttClient.publish(DHT_TEMP_AVAIL_TOPIC, "online", true);
+            mqttClient.publish(DHT_HUMID_AVAIL_TOPIC, "online", true);
+
             // listen to power topic
             mqttClient.subscribe(MQTT_POWER_TOPIC);
             mqttClient.subscribe(MQTT_TEMP_CONTROL_TOPIC);
@@ -143,6 +155,7 @@ void callback(char *topic, byte *payload, uint length)
         {
             Serial.println("Action - Temp - 25");
             IRsender.sendRaw(AC25, sizeof(AC25) / sizeof(AC25[0]), 38);
+            delay(100);
             mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "25.0", true);
         }
         if (strncmp((char *)payload, "26.0", length) == 0)
@@ -157,16 +170,43 @@ void callback(char *topic, byte *payload, uint length)
         if (strncmp((char *)payload, "ON", length) == 0)
         {
             Serial.println("Action - Power - ON");
-            // IRsender.sendRaw(AC25, sizeof(AC25) / sizeof(AC25[0]), 38);
-            // mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "25.0", true);
+            IRsender.sendRaw(ACON, sizeof(ACON) / sizeof(ACON[0]), 38);
+            //mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "ON", true);
         }
         if (strncmp((char *)payload, "OFF", length) == 0)
         {
             Serial.println("Action - Power - OFF");
             IRsender.sendRaw(ACOFF, sizeof(ACOFF) / sizeof(ACOFF[0]), 38);
+            
         }
     }
+
 }
+void readDHT(void *parameter)
+// handled by DHTTask
+{
+    for (;;)
+    {
+        // DHT
+        t = dht.readTemperature();
+        h = dht.readHumidity();
+        if (isnan(t) || isnan(h))
+        {
+            // Serial.println(F("DHT read NaN."));
+        }
+        else
+        {
+            Serial.print(F("DHT read temperature:"));
+            Serial.println(t);
+            mqttClient.publish(DHT_TEMP_TOPIC, (String(t).c_str()), true);
+            Serial.print(F("DHT read humidity:"));
+            Serial.println(h);
+            mqttClient.publish(DHT_HUMID_TOPIC, (String(h).c_str()), true);
+        }
+        vTaskDelay(2500 / portTICK_PERIOD_MS);
+    }
+}
+
 
 void setup()
 {
@@ -178,7 +218,16 @@ void setup()
     mqttClient.setServer(MQTT_BROKER, MQTT_BROKER_PORT);
     mqttClient.setCallback(callback);
 
+    // setup GPIO
+    // pinMode(23, OUTPUT);
+
+    // setup DHT
+    dht.begin();
+    xTaskCreate(readDHT, "readDHT", 2048, NULL, 1, &DHTTask);
+
     IRsender.begin();
+    
+
 }
 
 void loop()
@@ -197,5 +246,4 @@ void loop()
 
     // keep alive MQTT.
     mqttClient.loop();
-    delay(800); // to activate auto modem-sleep, hopefully
 }
