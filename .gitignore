@@ -1,3 +1,4 @@
 .vscode/**
 ArduinoOutput/**
 build/**
+.DS_Store
