@@ -11,7 +11,6 @@
 #include "include/settings.h"
 #include "include/acData.h"
 
-
 // setup wifi & mqtt
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -171,16 +170,14 @@ void callback(char *topic, byte *payload, uint length)
         {
             Serial.println("Action - Power - ON");
             IRsender.sendRaw(ACON, sizeof(ACON) / sizeof(ACON[0]), 38);
-            //mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "ON", true);
+            // mqttClient.publish(MQTT_TEMP_LISTEN_TOPIC, "ON", true);
         }
         if (strncmp((char *)payload, "OFF", length) == 0)
         {
             Serial.println("Action - Power - OFF");
             IRsender.sendRaw(ACOFF, sizeof(ACOFF) / sizeof(ACOFF[0]), 38);
-            
         }
     }
-
 }
 void readDHT(void *parameter)
 // handled by DHTTask
@@ -207,7 +204,6 @@ void readDHT(void *parameter)
     }
 }
 
-
 void setup()
 {
     Serial.begin(115200);
@@ -226,8 +222,6 @@ void setup()
     xTaskCreate(readDHT, "readDHT", 2048, NULL, 1, &DHTTask);
 
     IRsender.begin();
-    
-
 }
 
 void loop()
