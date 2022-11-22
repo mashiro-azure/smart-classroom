@@ -8,6 +8,8 @@
 These libraries can be installed through Arduino's Library Manager.
 - IRremoteESP8266
 - PubSubClient
+- DHT sensor library
+- Adafruit Unified Sensor
 
 ## Quick Testing
 1. Install `Mosquitto` from [mosquitto](https://mosquitto.org) or from your distro's repo.
