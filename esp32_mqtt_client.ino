@@ -240,4 +240,5 @@ void loop()
 
     // keep alive MQTT.
     mqttClient.loop();
+    delay(500); // required for xTask
 }
