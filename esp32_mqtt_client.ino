@@ -8,6 +8,8 @@
 #include <PubSubClient.h>
 #include <IRsend.h>
 #include <DHT.h>
+#include "ccs811.h"
+#include <Wire.h>
 #include "include/settings.h"
 #include "include/acData.h"
 
@@ -18,12 +20,16 @@ PubSubClient mqttClient(wifiClient);
 // setup ir
 IRsend IRsender(IRsendPin);
 
-// setup states
+// setup DHT
 bool lightOn;
 DHT dht(DHTPin, DHTType);
 TaskHandle_t DHTTask;
 volatile float t;
 volatile float h;
+
+// setup CCS811 
+CCS811 ccs811(CCS811pin);
+float eco2val, etvocval;
 
 void setup_wifi()
 {
@@ -75,6 +81,9 @@ void mqttReconnect()
             mqttClient.publish(MQTT_AVAIL_TOPIC, "online", true);
             mqttClient.publish(DHT_TEMP_AVAIL_TOPIC, "online", true);
             mqttClient.publish(DHT_HUMID_AVAIL_TOPIC, "online", true);
+            mqttClient.publish(CCS811_CO2_AVAIL_TOPIC, "online", true);
+            mqttClient.publish(CCS811_ETVOC_AVAIL_TOPIC, "online", true);
+
 
             // listen to power topic
             mqttClient.subscribe(MQTT_POWER_TOPIC);
@@ -200,6 +209,45 @@ void readDHT(void *parameter)
             Serial.println(h);
             mqttClient.publish(DHT_HUMID_TOPIC, (String(h).c_str()), true);
         }
+
+        // gas sensor
+        uint16_t eco2, etvoc, errstat, raw; // TODO: move out of loop()
+        ccs811.read(&eco2, &etvoc, &errstat, &raw);
+        if (errstat == CCS811_ERRSTAT_OK)
+        {
+            eco2val = eco2;
+            etvocval = etvoc;
+
+            Serial.print("CCS811: ");
+            Serial.print("eco2=");
+            Serial.print(eco2val);
+            Serial.print(" ppm  ");
+            mqttClient.publish(CCS811_CO2_TOPIC, (String(eco2val).c_str()), true);
+ 
+
+            Serial.print("etvoc=");
+            Serial.print(etvocval);
+            Serial.print(" ppb  ");
+            mqttClient.publish(CCS811_ETVOC_TOPIC, (String(etvocval).c_str()), true);
+            Serial.println();
+
+        }
+        else if (errstat == CCS811_ERRSTAT_OK_NODATA)
+        {
+            Serial.println("CCS811: waiting for (new) data");
+        }
+        else if (errstat & CCS811_ERRSTAT_I2CFAIL)
+        {
+            Serial.println("CCS811: I2C error");
+        }
+        else
+        {
+            Serial.print("CCS811: errstat=");
+            Serial.print(errstat, HEX);
+            Serial.print("=");
+            Serial.println(ccs811.errstat_str(errstat));
+        }
+
         vTaskDelay(2500 / portTICK_PERIOD_MS);
     }
 }
@@ -216,6 +264,18 @@ void setup()
 
     // setup GPIO
     // pinMode(23, OUTPUT);
+
+    // setup ccs811
+    // setup gas sensor
+    Wire.begin();
+    ccs811.set_i2cdelay(50);
+    bool ok = ccs811.begin();
+    if (!ok)
+        Serial.println("setup: CCS811 begin FAILED");
+
+    ok = ccs811.start(CCS811_MODE_1SEC);
+    if (!ok)
+        Serial.println("setup: CCS811 start FAILED");
 
     // setup DHT
     dht.begin();
